@@ -1,0 +1,46 @@
+group 'com.afonsoraposo.bitalino'
+version '1.0'
+
+buildscript {
+    repositories {
+        google()
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:4.0.1'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        jcenter()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'com.afonsoraposo.bitalino'
+    compileSdkVersion 36
+
+    defaultConfig {
+        minSdkVersion 23
+        multiDexEnabled true
+    }
+    lintOptions {
+        disable 'InvalidPackage'
+    }
+    dependencies {
+        implementation 'com.android.support:multidex:1.0.3'
+    }
+
+
+}
+
+dependencies {
+    implementation 'androidx.annotation:annotation:1.1.0'
+    implementation 'com.android.support:support-annotations:28.0.0'
+    implementation 'androidx.core:core:1.3.0'
+}

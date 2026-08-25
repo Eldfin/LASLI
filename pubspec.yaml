@@ -1,0 +1,34 @@
+name: lasli_flutter
+description: Flutter app for LASLI BITalino, XIAO MG24, and radar measurements with TFLite snore detection.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bitalino:
+    path: third_party/bitalino
+  fl_chart: ^1.2.0
+  path_provider: ^2.1.5
+  permission_handler: ^12.0.1
+  record: ^6.2.0
+  tflite_flutter: ^0.12.1
+  open_filex: ^4.7.0
+  share_plus: ^13.1.0
+  flutter_blue_plus: 2.3.3
+  model_viewer_plus: 1.10.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/models/yamnet.tflite
+    - assets/models/yamnet_class_map.csv
+    - assets/body_models/
