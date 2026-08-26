@@ -17,7 +17,7 @@ Die aktuellen Installationsdateien befinden sich unter
 | Plattform | Datei | Installation |
 | --- | --- | --- |
 | Android | `LASLI-release.apk` | Direkt auf dem Android-Geraet installieren |
-| iPhone/iPad | `LASLI-unsigned.ipa` | Mit SideStore oder Xcode signieren und installieren |
+| iPhone/iPad | `LASLI-unsigned.ipa` | Mit SideStore signieren und installieren |
 
 Da dieses Repository privat ist, muss der verwendete GitHub-Account zuvor als
 Mitwirkender eingeladen worden sein.
@@ -42,10 +42,11 @@ werden.
 
 ## iPhone oder iPad installieren
 
-Die IPA ist absichtlich nicht mit einem fremden Apple-Zertifikat signiert. Sie
-muss deshalb mit der eigenen Apple-ID signiert werden. Fuer einen Test ist
-SideStore meist der einfachste Weg; alternativ kann die App auf einem Mac mit
-Xcode installiert werden.
+Die IPA ist absichtlich nicht mit einem fremden Apple-Zertifikat signiert und
+muss deshalb in SideStore mit der eigenen Apple-ID signiert werden. Xcode
+installiert diese IPA nicht: Bei der Xcode-Variante wird LASLI stattdessen aus
+dem Quellcode gebaut, mit der eigenen Apple-ID signiert und direkt auf das
+iPhone uebertragen.
 
 ### Variante A: SideStore
 
@@ -68,7 +69,7 @@ Bei einer kostenlosen Apple-ID laeuft die Signierung nach sieben Tagen ab.
 SideStore muss die App daher regelmaessig aktualisieren. SideStore ist ein
 unabhaengiges Drittanbieterprojekt und nicht Bestandteil von LASLI.
 
-### Variante B: Xcode auf einem Mac
+### Variante B: Aus dem Quellcode mit Xcode
 
 Auf dem Mac muessen Xcode, Flutter, CocoaPods und Git installiert sein.
 
