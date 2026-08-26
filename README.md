@@ -1,207 +1,126 @@
-# LASLI Flutter App
+# LASLI
 
-Flutter/Dart-Version der LASLI-Mess-App fuer Android und iOS.
+LASLI ist eine experimentelle App zur Aufzeichnung und Auswertung von Schlaf-
+und Sensordaten. Sie verbindet sich per Bluetooth mit zwei LASLI-Sensoren auf
+Basis des Seeed Studio XIAO MG24 Sense und stellt unter anderem Herzfrequenz,
+Atemfrequenz, Ohrtemperatur, Koerperorientierung und Schnarchereignisse dar.
 
-## Enthalten
+> **Hinweis:** LASLI ist eine Test- und Forschungsanwendung. Sie ist kein
+> Medizinprodukt und darf nicht fuer Diagnosen oder medizinische Entscheidungen
+> verwendet werden.
 
-- BITalino-Anbindung ueber das `bitalino` Flutter-Plugin
-- Seeed Studio XIAO MG24 Sense Paar per BLE fuer Stirn-/Bauch-IMU, MAX30102,
-  Herzfrequenz, SpO2 und Bauchatmung
-- automatische BITalino-Auswahl aus gekoppelten Android-Bluetooth-Geraeten
-- YAMNet als TensorFlow-Lite-Modell via `tflite_flutter`
-- Live-Kurven via `fl_chart` statt Matplotlib
-- CSV-Export in den App-Dokumentenordner
-- MR60BHA2-Radarwerte ueber ESPHome Native API im gleichen WLAN
-- Schlafjournal mit Abend-/Morgenfragen, Schlafscore, Historie, Korrelationen
-  und personalisierten Tipps
-- Demo-Modus ohne Hardware
+## App herunterladen
 
-## Starten
+Die aktuellen Installationsdateien befinden sich unter
+**[Releases](https://github.com/Eldfin/LASLI/releases/latest)**:
 
-Die Android- und iOS-Plattformordner sind bereits erzeugt.
+| Plattform | Datei | Installation |
+| --- | --- | --- |
+| Android | `LASLI-release.apk` | Direkt auf dem Android-Geraet installieren |
+| iPhone/iPad | `LASLI-unsigned.ipa` | Mit SideStore oder Xcode signieren und installieren |
 
-```bash
-cd lasli_flutter
-flutter pub get
-flutter run
-```
+Da dieses Repository privat ist, muss der verwendete GitHub-Account zuvor als
+Mitwirkender eingeladen worden sein.
 
-Falls `flutter` in einem alten Terminal nicht gefunden wird, VS Code oder das
-Terminal neu starten. Der User-PATH sollte `C:\Users\eldfi\dev\flutter\bin`
-enthalten.
+## Android installieren
 
-## Android-Hinweise
+Voraussetzung ist ein Geraet mit Android 8.0 oder neuer.
 
-`tflite_flutter` benoetigt aktuell mindestens Android API 26. Das ist in
-`android/app/build.gradle.kts` bereits gesetzt:
+1. Auf der [Release-Seite](https://github.com/Eldfin/LASLI/releases/latest)
+   `LASLI-release.apk` herunterladen.
+2. Die heruntergeladene APK auf dem Android-Geraet oeffnen.
+3. Falls Android nachfragt, dem verwendeten Browser oder Dateimanager einmalig
+   das **Installieren unbekannter Apps** erlauben.
+4. Die Installation bestaetigen und LASLI starten.
+5. Die angefragten Berechtigungen fuer Bluetooth, Benachrichtigungen und
+   Mikrofon erteilen. Sie werden fuer Sensorverbindungen, Nachtmessungen und die
+   optionale Schnarcherkennung benoetigt.
 
-```gradle
-minSdk = 26
-```
+Android oder Google Play Protect kann darauf hinweisen, dass die App nicht aus
+dem Play Store stammt. Die Datei sollte nur aus diesem Repository installiert
+werden.
 
-Die Android-Berechtigungen sind in `android/app/src/main/AndroidManifest.xml`
-bereits eingetragen:
+## iPhone oder iPad installieren
 
-```xml
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-```
+Die IPA ist absichtlich nicht mit einem fremden Apple-Zertifikat signiert. Sie
+muss deshalb mit der eigenen Apple-ID signiert werden. Fuer einen Test ist
+SideStore meist der einfachste Weg; alternativ kann die App auf einem Mac mit
+Xcode installiert werden.
 
-Fuer Android wird automatisch Bluetooth Classic (`BTH`) genutzt. Die App sucht
-gekoppelte BITalinos automatisch; falls mehrere gefunden werden, waehle einen
-in der BITalino-Auswahl aus. Wenn keiner erscheint, den BITalino zuerst in den
-Android-Bluetooth-Einstellungen koppeln und in der App `Suchen` antippen.
+### Variante A: SideStore
 
-## MR60BHA2 Radar
+Voraussetzungen sind iOS/iPadOS 15 oder neuer, eine Apple-ID, WLAN und fuer die
+erste Einrichtung ein Computer.
 
-Der Radar-Sensor wird per WLAN ueber ESPHome Native API Port `6053` gelesen.
-In der App kann `Radar` aktiviert und im Feld `Radar IP` entweder `auto` oder
-eine feste IP-Adresse eingetragen werden. `auto` scannt die privaten `/24`-Netze,
-in denen das Handy gerade angemeldet ist. Das ersetzt den Windows-Hotspot, sobald
-der Sensor selbst als WLAN-Client im selben WLAN wie das Handy ist.
+1. SideStore anhand der
+   **[offiziellen Installationsanleitung](https://docs.sidestore.io/docs/installation/prerequisites)**
+   einrichten.
+2. Auf dem iPhone oder iPad `LASLI-unsigned.ipa` von der
+   [Release-Seite](https://github.com/Eldfin/LASLI/releases/latest)
+   herunterladen.
+3. `LocalDevVPN` aktivieren und SideStore oeffnen.
+4. Unter **My Apps** die heruntergeladene IPA auswaehlen und installieren.
+5. Falls iOS danach fragt, unter **Einstellungen > Allgemein > VPN und
+   Geraeteverwaltung** der eigenen Apple-ID vertrauen und den Entwicklermodus
+   aktivieren.
 
-Mit `WLAN einrichten` koennen WLAN-Zugangsdaten direkt an das ESPHome-Captive-
-Portal des Sensors gesendet werden. Dazu muss das Handy vorher mit dem Sensor-
-Hotspot `seeedstudio-mr60bha2` verbunden sein; die Standardadresse ist
-`192.168.4.1`. Android gibt Apps das Passwort des aktuell verbundenen WLANs
-nicht heraus, deshalb muss das WLAN-Passwort in der App eingegeben werden.
+Bei einer kostenlosen Apple-ID laeuft die Signierung nach sieben Tagen ab.
+SideStore muss die App daher regelmaessig aktualisieren. SideStore ist ein
+unabhaengiges Drittanbieterprojekt und nicht Bestandteil von LASLI.
 
-Die App zeigt live die ESPHome-Entities des MR60BHA2 an, unter anderem Herzrate,
-Atemrate, Person, Zielanzahl, Distanz und Beleuchtungsstaerke, sofern diese vom
-Sensor/Firmware-Build bereitgestellt werden. In der CSV werden zusaetzlich
-`radar_connected`, `radar_person_detected`, `radar_target_count`,
-`radar_distance_cm`, `radar_heart_rate_bpm`,
-`radar_breathing_rate_per_min` und `radar_illuminance_lx` gespeichert.
+### Variante B: Xcode auf einem Mac
 
-Wichtig: Der Sensor muss seine WLAN-Zugangsdaten bereits kennen. Die App kann
-ihn dann im gleichen WLAN finden und verbinden, sie provisioniert aber nicht
-automatisch ein neues WLAN auf die ESP32-Firmware.
-
-## XIAO MG24 Sense
-
-In der App `XIAO MG24` als Quelle fuer `Herz/Atmung` auswaehlen und
-`Sensoren suchen` antippen. Die Lageerkennung ist in diesem Modus immer aktiv:
-ein Board wird an der Stirn, eins am Bauch getragen. Die Atemfrequenz wird aus
-dem Winkelverlauf des Bauchsensors berechnet; Herzfrequenz und SpO2 kommen aus
-dem MAX30102 und duerfen von einem der beiden Boards gesendet werden.
-
-Die XIAO-Firmware muss ein BLE-GATT-Notify-Profil anbieten:
-
-```text
-Stirn-Name:  LASLI-FOREHEAD
-Bauch-Name:  LASLI-BELLY
-Service:     7a534c49-2f4d-4732-9d53-4d4732340001
-Notify-Char: 7a534c49-2f4d-4732-9d53-4d4732340002
-```
-
-Jede Notification ist UTF-8 und kann kompaktes JSON senden:
-
-```json
-{"r":"belly","a":[0.12,0.02,0.98],"pitch":7.5,"hr":71.2,"spo2":98.4,"bat":87}
-```
-
-Alternativ akzeptiert LASLI eine CSV-Zeile:
-
-```text
-role,time_ms,ax,ay,az,gx,gy,gz,roll,pitch,angle,hr,spo2,battery
-```
-
-`angle` ist der bevorzugte Lagewinkel in Grad. Fehlt er, nutzt LASLI `pitch`,
-danach `roll`, danach einen aus der Beschleunigung geschaetzten Winkel. Die CSV
-enthaelt zusaetzlich `oxygen_saturation_percent` und mehrere `mg24_*` Spalten.
-
-## Schlafjournal
-
-Beim Start einer Messung fragt LASLI die Abendfragen ab. Beim Stoppen wird die
-Messung beendet und danach werden die Morgenfragen abgefragt. Anschliessend
-speichert die App einen Schlafzyklus in einer zweiten CSV:
-
-```text
-messungen/schlafzyklen.csv
-```
-
-Diese Datei enthaelt die Fragebogenantworten, mittlere Herzfrequenz, mittlere
-Atemfrequenz, mittleren Relativwinkel zwischen Stirn und Brust, Schnarchanteil
-und den berechneten Schlafqualitaets-Score. Zusatzfragen koennen in der App
-unter `Zusatzfrage` angelegt werden; sie werden als 1-5-Score oder Ja/Nein
-gespeichert und fuer Korrelationen genutzt.
-
-Die Korrelationen werden erst ab mindestens vier gespeicherten Schlafzyklen
-angezeigt, weil einzelne Naechte sonst zu stark zufaellig waeren.
-
-Das alte `bitalino`-Plugin ist lokal unter `third_party/bitalino` eingebunden,
-damit es mit dem aktuellen Android Gradle Plugin baut.
-
-Debug-APK bauen:
+Auf dem Mac muessen Xcode, Flutter, CocoaPods und Git installiert sein.
 
 ```bash
-flutter build apk --debug
-```
-
-Ausgabe:
-
-```text
-build/app/outputs/flutter-apk/app-debug.apk
-```
-
-## Windows-Hinweise
-
-Der Windows-Desktop-Target ist erzeugt. Zum Testen auf dem PC:
-
-```bash
-flutter run -d windows
-```
-
-Falls Flutter meldet `Building with plugins requires symlink support`, aktiviere
-einmal den Windows-Entwicklermodus:
-
-```powershell
-start ms-settings:developers
-```
-
-Danach die Einstellungen schliessen und erneut ausfuehren:
-
-```bash
-flutter run -d windows
-```
-
-Auf Windows ist der Demo-Modus zum UI-Test gedacht. Die echte BITalino-Anbindung
-kommt in dieser Flutter-Version ueber das Android/iOS-Plugin.
-
-## iOS-Hinweise
-
-LASLI ist fuer iOS 13 und neuer vorbereitet. Die App verwendet dort:
-
-- XIAO-MG24-Verbindungen ueber Core Bluetooth,
-- `bluetooth-central` fuer BLE-Ereignisse im Hintergrund,
-- Bluetooth-State-Restoration nach einer iOS-Prozessbeendigung,
-- `audio` fuer die laufende lokale YAMNet-Schnarcherkennung,
-- einen nativen AVAudioEngine-Pfad mit monotonen Zeitstempeln fuer die
-  Synchronisierung von Schnarch- und Atemfenstern.
-
-Der `ios/Podfile` aktiviert beim `permission_handler` nur die benoetigten
-iOS-Berechtigungen fuer Bluetooth und Mikrofon. Auf dem Mac:
-
-```bash
+git clone https://github.com/Eldfin/LASLI.git
+cd LASLI
 flutter pub get
 cd ios
 pod install
-cd ..
-open ios/Runner.xcworkspace
+open Runner.xcworkspace
 ```
 
-In Xcode unter `Runner > Signing & Capabilities` das eigene Apple-Team waehlen
-und sicherstellen, dass die Bundle-ID `de.lasli.app` im Apple-Account
-registriert ist. Danach auf einem echten iPhone testen. BLE, Mikrofon,
-TensorFlow Lite und Hintergrundbetrieb lassen sich im Simulator nicht
-realistisch gemeinsam pruefen.
+Danach in Xcode:
 
-Ein Release-Build entsteht auf macOS mit:
+1. Das Projekt `Runner` und **Signing & Capabilities** oeffnen.
+2. Unter **Team** die eigene Apple-ID beziehungsweise das eigene
+   **Personal Team** waehlen.
+3. Falls Xcode es verlangt, eine eindeutige Bundle-ID eintragen.
+4. Das entsperrte iPhone per USB anschliessen und als Zielgeraet waehlen.
+5. Mit **Run** die App signieren und installieren.
+
+Auch diese kostenlose Xcode-Signierung ist jeweils sieben Tage gueltig.
+
+## Erster Start
+
+1. Bluetooth am Smartphone einschalten.
+2. Die beiden LASLI-Sensoren einschalten beziehungsweise mit ihrem Wake-Taster
+   aufwecken.
+3. In LASLI auf **Verbinden** tippen und warten, bis Stirn- und Bauchsensor als
+   verbunden angezeigt werden.
+4. Die Sensoren anlegen und die Messung auf dem Home-Bildschirm starten.
+5. Nach dem Countdown kann das Smartphone gesperrt werden. Zum Beenden LASLI
+   erneut oeffnen, die Sensoren verbinden und **Stoppen** waehlen.
+
+Ohne die zugehoerigen MG24-Sensoren kann die App geoeffnet und angesehen werden;
+Live-Messwerte stehen dann jedoch nicht zur Verfuegung.
+
+## Rueckmeldung geben
+
+Fehlerberichte und Beobachtungen koennen unter
+**[Issues](https://github.com/Eldfin/LASLI/issues)** eingetragen werden. Hilfreich
+sind dabei Smartphone-Modell, Android-/iOS-Version, verwendete Sensoren und eine
+moeglichst genaue Beschreibung der durchgefuehrten Schritte.
+
+## Fuer Entwickler
+
+LASLI wird mit Flutter entwickelt. Jeder Push auf `main` wird auf einem
+macOS-Runner analysiert, getestet und als unsignierte iOS-App gebaut. Der
+Quellcode kann lokal mit folgenden Befehlen geprueft werden:
 
 ```bash
-flutter build ipa --release
+flutter pub get
+flutter analyze
+flutter test
 ```
-
-Ein iOS-Build und die Apple-Signierung sind unter Windows nicht moeglich.
