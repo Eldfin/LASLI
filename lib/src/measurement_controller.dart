@@ -4219,6 +4219,12 @@ class MeasurementController extends ChangeNotifier {
     final result = _yamnetRawSnoreTracker.update(
       detector,
       AppMonotonicClock.wallTime(frame.endMonotonicUs),
+      threshold: _snoreAutomaticTeacherMode
+          ? yamnetRawTeacherSnoreThreshold
+          : yamnetMeasurementSnoreThreshold,
+      minimumConsecutiveCandidates: _snoreAutomaticTeacherMode
+          ? 1
+          : yamnetMeasurementMinimumConsecutiveFrames,
     );
     final completed = result.completedWindow;
     if (_snoreAutomaticTeacherMode && completed != null) {
@@ -4279,7 +4285,7 @@ class MeasurementController extends ChangeNotifier {
           );
     return SnoreState(
       isSnoring: result.active,
-      detectedNow: detector.rawCandidate,
+      detectedNow: result.detectedNow,
       score: result.rawScore.clamp(0.0, 1.0).toDouble(),
       rmsDb: result.rmsDb,
       snoreCount: result.windowId,

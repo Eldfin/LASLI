@@ -496,7 +496,10 @@ class AudioSnoreDetector {
             audioSamplingRate);
     _rawWindowCenterMonotonicUs =
         (_rawWindowStartMonotonicUs! + _rawWindowEndMonotonicUs!) ~/ 2;
-    _rawEnergyBurst = _rawCandidate
+    // Measurement detection is deliberately more sensitive than automatic
+    // teacher labels, so precise boundaries must also be available below the
+    // high-confidence teacher threshold.
+    _rawEnergyBurst = snoreScore >= yamnetMeasurementSnoreThreshold
         ? localizeYamnetAudioBurst(
             _energyHistory.toList(growable: false),
             inferenceStartMonotonicUs: _rawWindowStartMonotonicUs!,

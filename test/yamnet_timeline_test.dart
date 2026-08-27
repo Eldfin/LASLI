@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lasli_flutter/src/processing.dart';
 import 'package:lasli_flutter/src/yamnet_raw_snore_tracker.dart';
 import 'package:lasli_flutter/src/yamnet_snore_detector.dart';
 
@@ -93,5 +94,87 @@ void main() {
       ),
       isNull,
     );
+  });
+
+  test('measurement requires two candidates and keeps the first onset', () {
+    final gate = YamnetConsecutiveCandidateGate();
+    final firstStart = DateTime(2026, 8, 27, 12);
+
+    final first = gate.update(
+      score: 0.62,
+      threshold: yamnetMeasurementSnoreThreshold,
+      minimumConsecutiveCandidates: yamnetMeasurementMinimumConsecutiveFrames,
+      intervalStartAt: firstStart,
+    );
+    final second = gate.update(
+      score: 0.57,
+      threshold: yamnetMeasurementSnoreThreshold,
+      minimumConsecutiveCandidates: yamnetMeasurementMinimumConsecutiveFrames,
+      intervalStartAt: firstStart.add(const Duration(milliseconds: 100)),
+    );
+    final thirdStart = firstStart.add(const Duration(milliseconds: 200));
+    final third = gate.update(
+      score: 0.65,
+      threshold: yamnetMeasurementSnoreThreshold,
+      minimumConsecutiveCandidates: yamnetMeasurementMinimumConsecutiveFrames,
+      intervalStartAt: thirdStart,
+    );
+
+    expect(first.confirmed, isFalse);
+    expect(second.confirmed, isTrue);
+    expect(second.firstIntervalStartAt, firstStart);
+    expect(third.confirmed, isTrue);
+    expect(third.firstIntervalStartAt, thirdStart);
+  });
+
+  test('a sub-threshold frame resets measurement confirmation', () {
+    final gate = YamnetConsecutiveCandidateGate();
+    final start = DateTime(2026, 8, 27, 12);
+
+    gate.update(
+      score: 0.60,
+      threshold: yamnetMeasurementSnoreThreshold,
+      minimumConsecutiveCandidates: yamnetMeasurementMinimumConsecutiveFrames,
+      intervalStartAt: start,
+    );
+    gate.update(
+      score: 0.30,
+      threshold: yamnetMeasurementSnoreThreshold,
+      minimumConsecutiveCandidates: yamnetMeasurementMinimumConsecutiveFrames,
+      intervalStartAt: start.add(const Duration(milliseconds: 100)),
+    );
+    final restarted = gate.update(
+      score: 0.70,
+      threshold: yamnetMeasurementSnoreThreshold,
+      minimumConsecutiveCandidates: yamnetMeasurementMinimumConsecutiveFrames,
+      intervalStartAt: start.add(const Duration(milliseconds: 200)),
+    );
+
+    expect(restarted.confirmed, isFalse);
+    expect(
+      restarted.firstIntervalStartAt,
+      start.add(const Duration(milliseconds: 200)),
+    );
+  });
+
+  test('automatic teacher labels keep their high-confidence single hit', () {
+    final gate = YamnetConsecutiveCandidateGate();
+    final start = DateTime(2026, 8, 27, 12);
+
+    final tooWeak = gate.update(
+      score: 0.79,
+      threshold: yamnetRawTeacherSnoreThreshold,
+      minimumConsecutiveCandidates: 1,
+      intervalStartAt: start,
+    );
+    final accepted = gate.update(
+      score: 0.81,
+      threshold: yamnetRawTeacherSnoreThreshold,
+      minimumConsecutiveCandidates: 1,
+      intervalStartAt: start.add(const Duration(milliseconds: 100)),
+    );
+
+    expect(tooWeak.confirmed, isFalse);
+    expect(accepted.confirmed, isTrue);
   });
 }

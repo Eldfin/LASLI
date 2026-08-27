@@ -127,6 +127,62 @@ class YamnetRawSnoreResult {
       completedWindow?.endAt ?? activeEndAt ?? updatedAt;
 }
 
+class YamnetCandidateDecision {
+  const YamnetCandidateDecision({
+    required this.confirmed,
+    this.firstIntervalStartAt,
+  });
+
+  final bool confirmed;
+  final DateTime? firstIntervalStartAt;
+}
+
+class YamnetConsecutiveCandidateGate {
+  double? _threshold;
+  int? _minimumConsecutiveCandidates;
+  int _streak = 0;
+  DateTime? _firstIntervalStartAt;
+
+  void reset() {
+    _threshold = null;
+    _minimumConsecutiveCandidates = null;
+    _streak = 0;
+    _firstIntervalStartAt = null;
+  }
+
+  YamnetCandidateDecision update({
+    required double score,
+    required double threshold,
+    required int minimumConsecutiveCandidates,
+    required DateTime intervalStartAt,
+  }) {
+    final requiredCandidates =
+        minimumConsecutiveCandidates < 1 ? 1 : minimumConsecutiveCandidates;
+    if (_threshold != threshold ||
+        _minimumConsecutiveCandidates != requiredCandidates) {
+      _threshold = threshold;
+      _minimumConsecutiveCandidates = requiredCandidates;
+      _streak = 0;
+      _firstIntervalStartAt = null;
+    }
+
+    if (!score.isFinite || score < threshold) {
+      _streak = 0;
+      _firstIntervalStartAt = null;
+      return const YamnetCandidateDecision(confirmed: false);
+    }
+
+    _firstIntervalStartAt ??= intervalStartAt;
+    _streak++;
+    final newlyConfirmed = _streak == requiredCandidates;
+    return YamnetCandidateDecision(
+      confirmed: _streak >= requiredCandidates,
+      firstIntervalStartAt:
+          newlyConfirmed ? _firstIntervalStartAt : intervalStartAt,
+    );
+  }
+}
+
 class YamnetRawSnoreTracker {
   YamnetRawSnoreTracker();
 
@@ -137,6 +193,8 @@ class YamnetRawSnoreTracker {
   static const _staleTimeout = Duration(seconds: 2);
 
   final Queue<DateTime> _completedWindowEnds = Queue<DateTime>();
+  final YamnetConsecutiveCandidateGate _candidateGate =
+      YamnetConsecutiveCandidateGate();
 
   var _result = const YamnetRawSnoreResult.empty();
   int _lastInferenceId = 0;
@@ -153,9 +211,15 @@ class YamnetRawSnoreTracker {
     _windowId = 0;
     _activeStartAt = null;
     _activeEndAt = null;
+    _candidateGate.reset();
   }
 
-  YamnetRawSnoreResult update(AudioSnoreDetector? detector, DateTime now) {
+  YamnetRawSnoreResult update(
+    AudioSnoreDetector? detector,
+    DateTime now, {
+    required double threshold,
+    required int minimumConsecutiveCandidates,
+  }) {
     if (detector == null || detector.rawInferenceId <= 0) {
       return _expireIfStale(now);
     }
@@ -178,7 +242,15 @@ class YamnetRawSnoreTracker {
           );
     final intervalStart = interval.startAt;
     final intervalEnd = interval.endAt;
-    final candidate = detector.rawScore >= yamnetRawTeacherSnoreThreshold;
+    final candidateDecision = _candidateGate.update(
+      score: detector.rawScore,
+      threshold: threshold,
+      minimumConsecutiveCandidates: minimumConsecutiveCandidates,
+      intervalStartAt: intervalStart,
+    );
+    final candidate = candidateDecision.confirmed;
+    final candidateStart =
+        candidateDecision.firstIntervalStartAt ?? intervalStart;
     YamnetRawSnoreWindow? completedWindow;
     var detectedNow = false;
 
@@ -188,7 +260,7 @@ class YamnetRawSnoreTracker {
           activeEnd == null ||
           intervalStart.isAfter(activeEnd.add(_mergeGap))) {
         completedWindow = _closeWindow();
-        _activeStartAt = intervalStart;
+        _activeStartAt = candidateStart;
         _activeEndAt = intervalEnd;
         _windowId++;
         detectedNow = true;

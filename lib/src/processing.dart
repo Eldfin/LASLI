@@ -15,6 +15,8 @@ const yamnetInputSamples = 15600;
 // a snore burst. The model still receives its native 975 ms input window.
 const yamnetInferenceSeconds = 0.10;
 const yamnetSnoreThreshold = 0.10;
+const yamnetMeasurementSnoreThreshold = 0.50;
+const yamnetMeasurementMinimumConsecutiveFrames = 2;
 const yamnetRawTeacherSnoreThreshold = 0.80;
 const yamnetRawTeacherWindowMergeGapSeconds = 0.20;
 const yamnetScoreSmoothing = 0.45;
