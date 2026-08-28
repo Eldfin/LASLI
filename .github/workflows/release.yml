@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.9
+          channel: stable
+          cache: true
+
+      - name: Install Flutter packages
+        run: flutter pub get
+
+      - name: Analyze Dart
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build Android release
+        run: flutter build apk --release
+
+      - name: Name Android package
+        run: cp build/app/outputs/flutter-apk/app-release.apk LASLI-release.apk
+
+      - name: Upload Android package
+        uses: actions/upload-artifact@v4
+        with:
+          name: LASLI-android-release
+          path: LASLI-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.9
+          channel: stable
+          cache: true
+
+      - name: Install Flutter packages
+        run: flutter pub get
+
+      - name: Install iOS pods
+        run: pod install
+        working-directory: ios
+
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p build/ios/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/ios/ipa/Payload \
+            build/ios/ipa/LASLI-unsigned.ipa
+
+      - name: Upload iOS package
+        uses: actions/upload-artifact@v4
+        with:
+          name: LASLI-ios-unsigned-ipa
+          path: build/ios/ipa/LASLI-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs:
+      - build-android
+      - build-ios
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release-assets/LASLI-release.apk
+            release-assets/LASLI-unsigned.ipa
