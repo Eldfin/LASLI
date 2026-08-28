@@ -6539,15 +6539,44 @@ class _SnoreTrainingControls extends StatelessWidget {
                 value:
                     '${controller.yamnetSnoreScorePercent!.toStringAsFixed(0)}%',
               ),
+            if (controller.yamnetBreathingScorePercent != null)
+              _InfoPill(
+                label: 'Atmen',
+                value:
+                    '${controller.yamnetBreathingScorePercent!.toStringAsFixed(0)}%',
+              ),
+            if (controller.yamnetWindScorePercent != null)
+              _InfoPill(
+                label: 'Wind/Pusten',
+                value:
+                    '${controller.yamnetWindScorePercent!.toStringAsFixed(0)}%',
+              ),
+            if (controller.yamnetVoiceScorePercent != null)
+              _InfoPill(
+                label: 'Sprache',
+                value:
+                    '${controller.yamnetVoiceScorePercent!.toStringAsFixed(0)}%',
+              ),
+            if (controller.yamnetInputGainDb != null)
+              _InfoPill(
+                label: 'Auto-Pegel',
+                value:
+                    '+${controller.yamnetInputGainDb!.toStringAsFixed(0)} dB',
+              ),
+            if (controller.yamnetRejectionReason != null &&
+                controller.yamnetSnoreScorePercent != null &&
+                controller.yamnetSnoreScorePercent! >= 8)
+              _InfoPill(
+                label: 'Blockiert als',
+                value: controller.yamnetRejectionReason!,
+              ),
             OutlinedButton.icon(
               onPressed:
                   active || controller.developerYamnetMonitorStartInProgress
                       ? null
                       : yamnetMonitoring
                           ? controller.stopDeveloperYamnetMonitor
-                          : recordingAvailable
-                              ? controller.startDeveloperYamnetMonitor
-                              : null,
+                          : controller.startDeveloperYamnetMonitor,
               icon: controller.developerYamnetMonitorStartInProgress
                   ? const SizedBox.square(
                       dimension: 17,

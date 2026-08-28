@@ -4,6 +4,106 @@ import 'package:lasli_flutter/src/yamnet_raw_snore_tracker.dart';
 import 'package:lasli_flutter/src/yamnet_snore_detector.dart';
 
 void main() {
+  YamnetClassScores scores({
+    double snoring = 0.10,
+    double breathing = 0.05,
+    double speech = 0.01,
+    double whispering = 0.01,
+    double sigh = 0.01,
+    double wheeze = 0.01,
+    double gasp = 0.01,
+    double pant = 0.01,
+    double snort = 0.01,
+    double cough = 0.01,
+    double wind = 0.01,
+    double microphoneWind = 0.01,
+  }) {
+    return YamnetClassScores(
+      snoring: snoring,
+      breathing: breathing,
+      speech: speech,
+      whispering: whispering,
+      sigh: sigh,
+      wheeze: wheeze,
+      gasp: gasp,
+      pant: pant,
+      snort: snort,
+      cough: cough,
+      wind: wind,
+      microphoneWind: microphoneWind,
+    );
+  }
+
+  test('accepts quiet snoring when competing classes stay low', () {
+    final decision = evaluateYamnetSnoreEvidence(
+      scores(snoring: 0.10, breathing: 0.18),
+    );
+
+    expect(decision.accepted, isTrue);
+    expect(decision.score, 0.10);
+  });
+
+  test('rejects blowing despite a simultaneous snoring score', () {
+    final decision = evaluateYamnetSnoreEvidence(
+      scores(snoring: 0.42, microphoneWind: 0.48),
+    );
+
+    expect(decision.accepted, isFalse);
+    expect(decision.rejectionReason, 'Wind/Pusten');
+  });
+
+  test('rejects deep breathing without dominant snoring evidence', () {
+    final decision = evaluateYamnetSnoreEvidence(
+      scores(snoring: 0.10, breathing: 0.46),
+    );
+
+    expect(decision.accepted, isFalse);
+    expect(decision.rejectionReason, 'Atmen ohne Schnarch-Evidenz');
+  });
+
+  test('rejects speech despite a weak snoring score', () {
+    final decision = evaluateYamnetSnoreEvidence(
+      scores(snoring: 0.11, speech: 0.38),
+    );
+
+    expect(decision.accepted, isFalse);
+    expect(decision.rejectionReason, 'Sprache');
+  });
+
+  test('adaptive gain lifts a distant event but not flat room noise', () {
+    final distantEvent = <YamnetAudioEnergyFrame>[
+      for (var centerUs = 5000; centerUs < 4000000; centerUs += 10000)
+        YamnetAudioEnergyFrame(
+          centerMonotonicUs: centerUs,
+          rmsDb: centerUs < 3000000 ? -61 : -45,
+        ),
+    ];
+    final flatNoise = <YamnetAudioEnergyFrame>[
+      for (var centerUs = 5000; centerUs < 4000000; centerUs += 10000)
+        YamnetAudioEnergyFrame(
+          centerMonotonicUs: centerUs,
+          rmsDb: -60 + (centerUs % 30000) / 30000,
+        ),
+    ];
+
+    expect(
+      calculateYamnetAdaptiveGainDb(
+        distantEvent,
+        inferenceStartMonotonicUs: 3000000,
+        inferenceEndMonotonicUs: 4000000,
+      ),
+      closeTo(19, 0.2),
+    );
+    expect(
+      calculateYamnetAdaptiveGainDb(
+        flatNoise,
+        inferenceStartMonotonicUs: 3000000,
+        inferenceEndMonotonicUs: 4000000,
+      ),
+      0,
+    );
+  });
+
   test('uses the full analyzed audio lookback only at the start boundary', () {
     final center = DateTime(2026, 8, 21, 12);
     final interval = yamnetReportedSnoreInterval(center);
@@ -96,7 +196,7 @@ void main() {
     );
   });
 
-  test('measurement requires two candidates and keeps the first onset', () {
+  test('measurement requires three candidates and keeps the first onset', () {
     final gate = YamnetConsecutiveCandidateGate();
     final firstStart = DateTime(2026, 8, 27, 12);
 
@@ -121,10 +221,9 @@ void main() {
     );
 
     expect(first.confirmed, isFalse);
-    expect(second.confirmed, isTrue);
-    expect(second.firstIntervalStartAt, firstStart);
+    expect(second.confirmed, isFalse);
     expect(third.confirmed, isTrue);
-    expect(third.firstIntervalStartAt, thirdStart);
+    expect(third.firstIntervalStartAt, firstStart);
   });
 
   test('a sub-threshold frame resets measurement confirmation', () {
@@ -138,7 +237,7 @@ void main() {
       intervalStartAt: start,
     );
     gate.update(
-      score: 0.30,
+      score: 0.03,
       threshold: yamnetMeasurementSnoreThreshold,
       minimumConsecutiveCandidates: yamnetMeasurementMinimumConsecutiveFrames,
       intervalStartAt: start.add(const Duration(milliseconds: 100)),

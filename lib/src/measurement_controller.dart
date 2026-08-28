@@ -461,6 +461,23 @@ class MeasurementController extends ChangeNotifier {
   double? get yamnetSnoreScorePercent => _snoreDetector == null
       ? null
       : (_snoreDetector!.rawScore * 100).clamp(0.0, 100.0).toDouble();
+  double? get yamnetBreathingScorePercent => _snoreDetector?.classScores == null
+      ? null
+      : (_snoreDetector!.classScores!.breathing * 100)
+          .clamp(0.0, 100.0)
+          .toDouble();
+  double? get yamnetWindScorePercent => _snoreDetector?.classScores == null
+      ? null
+      : (_snoreDetector!.classScores!.windLike * 100)
+          .clamp(0.0, 100.0)
+          .toDouble();
+  double? get yamnetVoiceScorePercent => _snoreDetector?.classScores == null
+      ? null
+      : (_snoreDetector!.classScores!.voiceLike * 100)
+          .clamp(0.0, 100.0)
+          .toDouble();
+  double? get yamnetInputGainDb => _snoreDetector?.inputGainDb;
+  String? get yamnetRejectionReason => _snoreDetector?.rejectionReason;
   int get automaticTeacherWindowCount =>
       _snoreAutomaticTeacherWindows.length +
       (_yamnetRawSnoreTracker.snapshot.active ? 1 : 0);
@@ -1199,13 +1216,6 @@ class MeasurementController extends ChangeNotifier {
         _developerYamnetMonitorStartInProgress) {
       return;
     }
-    if (!_mg24.forehead.connected) {
-      snapshot = snapshot.copyWith(
-        status: 'YAMNet-Livevergleich benoetigt den Stirn-MG24.',
-      );
-      notifyListeners();
-      return;
-    }
     _developerYamnetMonitorStartInProgress = true;
     notifyListeners();
     try {
@@ -1219,11 +1229,13 @@ class MeasurementController extends ChangeNotifier {
       if (_snoreDetector == null) return;
       _liveYamnetWindows.clear();
       _developerYamnetMonitorActive = true;
-      _mg24YamnetTeacherActive = true;
+      _mg24YamnetTeacherActive = _mg24.forehead.connected;
       _yamnetMonitorForegroundOwner = true;
       await _refreshForegroundService();
       snapshot = snapshot.copyWith(
-        status: 'Livevergleich aktiv: Board-Modell und YAMNet.',
+        status: _mg24YamnetTeacherActive
+            ? 'Livevergleich aktiv: Board-Modell und YAMNet.'
+            : 'YAMNet-Handytest aktiv.',
       );
     } finally {
       _developerYamnetMonitorStartInProgress = false;
@@ -4225,6 +4237,8 @@ class MeasurementController extends ChangeNotifier {
       minimumConsecutiveCandidates: _snoreAutomaticTeacherMode
           ? 1
           : yamnetMeasurementMinimumConsecutiveFrames,
+      decisionScore:
+          _snoreAutomaticTeacherMode ? detector.rawScore : frame.decisionScore,
     );
     final completed = result.completedWindow;
     if (_snoreAutomaticTeacherMode && completed != null) {

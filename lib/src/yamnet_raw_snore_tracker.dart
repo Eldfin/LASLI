@@ -219,6 +219,7 @@ class YamnetRawSnoreTracker {
     DateTime now, {
     required double threshold,
     required int minimumConsecutiveCandidates,
+    double? decisionScore,
   }) {
     if (detector == null || detector.rawInferenceId <= 0) {
       return _expireIfStale(now);
@@ -243,7 +244,7 @@ class YamnetRawSnoreTracker {
     final intervalStart = interval.startAt;
     final intervalEnd = interval.endAt;
     final candidateDecision = _candidateGate.update(
-      score: detector.rawScore,
+      score: decisionScore ?? detector.rawScore,
       threshold: threshold,
       minimumConsecutiveCandidates: minimumConsecutiveCandidates,
       intervalStartAt: intervalStart,

@@ -185,8 +185,11 @@ class YamnetInferenceFrame {
     required this.centerMonotonicUs,
     required this.endMonotonicUs,
     required this.score,
+    required this.decisionScore,
     required this.candidate,
     required this.rmsDb,
+    required this.inputGainDb,
+    this.rejectionReason,
   });
 
   final int inferenceId;
@@ -194,15 +197,157 @@ class YamnetInferenceFrame {
   final int centerMonotonicUs;
   final int endMonotonicUs;
   final double score;
+  final double decisionScore;
   final bool candidate;
   final double rmsDb;
+  final double inputGainDb;
+  final String? rejectionReason;
+}
+
+class YamnetClassScores {
+  const YamnetClassScores({
+    required this.snoring,
+    required this.breathing,
+    required this.speech,
+    required this.whispering,
+    required this.sigh,
+    required this.wheeze,
+    required this.gasp,
+    required this.pant,
+    required this.snort,
+    required this.cough,
+    required this.wind,
+    required this.microphoneWind,
+  });
+
+  final double snoring;
+  final double breathing;
+  final double speech;
+  final double whispering;
+  final double sigh;
+  final double wheeze;
+  final double gasp;
+  final double pant;
+  final double snort;
+  final double cough;
+  final double wind;
+  final double microphoneWind;
+
+  double get windLike => math.max(wind, microphoneWind);
+  double get voiceLike => math.max(speech, whispering);
+  double get otherRespiratory => math.max(
+        breathing,
+        math.max(
+          sigh,
+          math.max(
+            wheeze,
+            math.max(gasp, math.max(pant, math.max(snort, cough))),
+          ),
+        ),
+      );
+}
+
+class YamnetSnoreDecision {
+  const YamnetSnoreDecision({
+    required this.score,
+    required this.accepted,
+    this.rejectionReason,
+  });
+
+  final double score;
+  final bool accepted;
+  final String? rejectionReason;
+}
+
+YamnetSnoreDecision evaluateYamnetSnoreEvidence(YamnetClassScores scores) {
+  final snore = scores.snoring;
+  if (!snore.isFinite || snore < yamnetMeasurementSnoreThreshold) {
+    return const YamnetSnoreDecision(
+      score: 0,
+      accepted: false,
+      rejectionReason: 'zu wenig Schnarch-Evidenz',
+    );
+  }
+
+  if (scores.windLike >= math.max(0.08, snore * 0.80)) {
+    return const YamnetSnoreDecision(
+      score: 0,
+      accepted: false,
+      rejectionReason: 'Wind/Pusten',
+    );
+  }
+  if (scores.voiceLike >= math.max(0.15, snore * 2.0)) {
+    return const YamnetSnoreDecision(
+      score: 0,
+      accepted: false,
+      rejectionReason: 'Sprache',
+    );
+  }
+  if (scores.breathing >= math.max(0.25, snore * 3.0)) {
+    return const YamnetSnoreDecision(
+      score: 0,
+      accepted: false,
+      rejectionReason: 'Atmen ohne Schnarch-Evidenz',
+    );
+  }
+  final transientRespiratory = math.max(
+    scores.sigh,
+    math.max(
+      scores.gasp,
+      math.max(scores.pant, math.max(scores.snort, scores.cough)),
+    ),
+  );
+  if (transientRespiratory >= math.max(0.18, snore * 2.5)) {
+    return const YamnetSnoreDecision(
+      score: 0,
+      accepted: false,
+      rejectionReason: 'anderes Atemgeraeusch',
+    );
+  }
+  return YamnetSnoreDecision(score: snore, accepted: true);
+}
+
+double calculateYamnetAdaptiveGainDb(
+  List<YamnetAudioEnergyFrame> frames, {
+  required int inferenceStartMonotonicUs,
+  required int inferenceEndMonotonicUs,
+}) {
+  if (frames.length < 12 ||
+      inferenceEndMonotonicUs <= inferenceStartMonotonicUs) {
+    return 0;
+  }
+  final historyStartUs = inferenceStartMonotonicUs - 3000000;
+  final history = <double>[
+    for (final frame in frames)
+      if (frame.centerMonotonicUs >= historyStartUs &&
+          frame.centerMonotonicUs <= inferenceEndMonotonicUs)
+        frame.rmsDb,
+  ]..sort();
+  final current = <double>[
+    for (final frame in frames)
+      if (frame.centerMonotonicUs >= inferenceStartMonotonicUs &&
+          frame.centerMonotonicUs <= inferenceEndMonotonicUs)
+        frame.rmsDb,
+  ]..sort();
+  if (history.length < 12 || current.length < 8) return 0;
+
+  final background = _orderedPercentile(history, 20);
+  final eventPeak = _orderedPercentile(current, 90);
+  if (!background.isFinite ||
+      !eventPeak.isFinite ||
+      eventPeak - background < yamnetAdaptiveGainMinimumContrastDb) {
+    return 0;
+  }
+  return (yamnetAdaptiveGainTargetPeakDbfs - eventPeak)
+      .clamp(0.0, yamnetAdaptiveGainMaximumDb)
+      .toDouble();
 }
 
 class YamnetClassifier {
-  YamnetClassifier._(this._interpreter, this._snoreIndex);
+  YamnetClassifier._(this._interpreter, this._classIndices);
 
   final Interpreter _interpreter;
-  final int _snoreIndex;
+  final Map<String, int> _classIndices;
 
   static Future<YamnetClassifier> create() async {
     final interpreter = await Interpreter.fromAsset(
@@ -212,10 +357,17 @@ class YamnetClassifier {
     final classMap = await rootBundle.loadString(
       'assets/models/yamnet_class_map.csv',
     );
-    return YamnetClassifier._(interpreter, _findSnoreIndex(classMap));
+    final classIndices = _classIndexMap(classMap);
+    if (!classIndices.containsKey('snoring')) {
+      throw StateError("YAMNet class 'Snoring' not found.");
+    }
+    return YamnetClassifier._(interpreter, classIndices);
   }
 
-  double score(Float32List samples) {
+  YamnetClassScores classify(
+    Float32List samples, {
+    double gainDb = 0,
+  }) {
     if (samples.length != yamnetInputSamples) {
       throw ArgumentError('YAMNet expects $yamnetInputSamples samples.');
     }
@@ -226,28 +378,56 @@ class YamnetClassifier {
     }
     mean /= samples.length;
 
+    final gain = math.pow(10, gainDb.clamp(0, 30) / 20).toDouble();
     final input = Float32List(samples.length);
     for (var i = 0; i < samples.length; i++) {
-      input[i] = samples[i] - mean;
+      input[i] = ((samples[i] - mean) * gain).clamp(-1.0, 1.0).toDouble();
     }
 
     final output = List.generate(1, (_) => List<double>.filled(521, 0));
     _interpreter.run(input, output);
-    return output.first[_snoreIndex];
+    final values = output.first;
+    double value(String name) {
+      final index = _classIndices[name];
+      return index == null ? 0 : values[index];
+    }
+
+    return YamnetClassScores(
+      snoring: value('snoring'),
+      breathing: value('breathing'),
+      speech: value('speech'),
+      whispering: value('whispering'),
+      sigh: value('sigh'),
+      wheeze: value('wheeze'),
+      gasp: value('gasp'),
+      pant: value('pant'),
+      snort: value('snort'),
+      cough: value('cough'),
+      wind: value('wind'),
+      microphoneWind: value('wind noise (microphone)'),
+    );
   }
 
   void close() => _interpreter.close();
 
-  static int _findSnoreIndex(String csv) {
+  static Map<String, int> _classIndexMap(String csv) {
+    final result = <String, int>{};
     final lines = csv.split(RegExp(r'\r?\n'));
     for (final line in lines.skip(1)) {
       if (line.trim().isEmpty) continue;
       final parts = line.split(',');
-      if (parts.length >= 3 && parts[2].trim().toLowerCase() == 'snoring') {
-        return int.parse(parts[0]);
-      }
+      if (parts.length < 3) continue;
+      final index = int.tryParse(parts[0]);
+      if (index == null) continue;
+      final displayName = parts
+          .sublist(2)
+          .join(',')
+          .trim()
+          .replaceAll(RegExp(r'^"|"$'), '')
+          .toLowerCase();
+      result[displayName] = index;
     }
-    throw StateError("YAMNet class 'Snoring' not found.");
+    return result;
   }
 }
 
@@ -279,7 +459,11 @@ class AudioSnoreDetector {
   var _snoreCount = 0;
   var _inferenceId = 0;
   var _rawScore = 0.0;
+  var _decisionScore = 0.0;
   var _rawCandidate = false;
+  var _inputGainDb = 0.0;
+  String? _rejectionReason;
+  YamnetClassScores? _classScores;
   DateTime? _rawWindowCenterAt;
   int? _rawWindowStartMonotonicUs;
   int? _rawWindowCenterMonotonicUs;
@@ -295,7 +479,11 @@ class AudioSnoreDetector {
 
   SnoreState get snapshot => _state;
   double get rawScore => _rawScore;
+  double get decisionScore => _decisionScore;
   bool get rawCandidate => _rawCandidate;
+  double get inputGainDb => _inputGainDb;
+  String? get rejectionReason => _rejectionReason;
+  YamnetClassScores? get classScores => _classScores;
   int get rawInferenceId => _inferenceId;
   DateTime? get rawWindowCenterAt => _rawWindowCenterAt;
   int? get rawWindowStartMonotonicUs => _rawWindowStartMonotonicUs;
@@ -373,6 +561,10 @@ class AudioSnoreDetector {
     _energySamples = 0;
     _energySumSquares = 0;
     _rawEnergyBurst = null;
+    _decisionScore = 0;
+    _inputGainDb = 0;
+    _rejectionReason = null;
+    _classScores = null;
   }
 
   void _consumePcm(
@@ -485,21 +677,36 @@ class AudioSnoreDetector {
     final rms = math.sqrt(sumSquares / _audioWindow.length + 1e-12);
     _currentRmsDb = 20 * log10(rms + 1e-12);
 
-    final snoreScore = classifier.score(_audioWindow);
-    _rawScore = snoreScore;
-    _rawCandidate = snoreScore >= yamnetRawTeacherSnoreThreshold;
-    _rawWindowEndMonotonicUs =
+    final inferenceEndUs =
         _latestAudioSampleEndMonotonicUs ?? AppMonotonicClock.nowUs();
-    _rawWindowStartMonotonicUs = _rawWindowEndMonotonicUs! -
+    final inferenceStartUs = inferenceEndUs -
         (yamnetInputSamples *
             Duration.microsecondsPerSecond ~/
             audioSamplingRate);
+    _inputGainDb = calculateYamnetAdaptiveGainDb(
+      _energyHistory.toList(growable: false),
+      inferenceStartMonotonicUs: inferenceStartUs,
+      inferenceEndMonotonicUs: inferenceEndUs,
+    );
+    final classScores = classifier.classify(
+      _audioWindow,
+      gainDb: _inputGainDb,
+    );
+    final decision = evaluateYamnetSnoreEvidence(classScores);
+    final snoreScore = classScores.snoring;
+    _classScores = classScores;
+    _rawScore = snoreScore;
+    _decisionScore = decision.score;
+    _rejectionReason = decision.rejectionReason;
+    _rawCandidate = snoreScore >= yamnetRawTeacherSnoreThreshold;
+    _rawWindowEndMonotonicUs = inferenceEndUs;
+    _rawWindowStartMonotonicUs = inferenceStartUs;
     _rawWindowCenterMonotonicUs =
         (_rawWindowStartMonotonicUs! + _rawWindowEndMonotonicUs!) ~/ 2;
     // Measurement detection is deliberately more sensitive than automatic
     // teacher labels, so precise boundaries must also be available below the
     // high-confidence teacher threshold.
-    _rawEnergyBurst = snoreScore >= yamnetMeasurementSnoreThreshold
+    _rawEnergyBurst = decision.accepted
         ? localizeYamnetAudioBurst(
             _energyHistory.toList(growable: false),
             inferenceStartMonotonicUs: _rawWindowStartMonotonicUs!,
@@ -545,8 +752,11 @@ class AudioSnoreDetector {
         centerMonotonicUs: _rawWindowCenterMonotonicUs!,
         endMonotonicUs: _rawWindowEndMonotonicUs!,
         score: _rawScore,
+        decisionScore: _decisionScore,
         candidate: _rawCandidate,
         rmsDb: _currentRmsDb,
+        inputGainDb: _inputGainDb,
+        rejectionReason: _rejectionReason,
       ),
     );
   }
